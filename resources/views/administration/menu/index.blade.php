@@ -38,7 +38,7 @@
                     data: null,
                     createdCell: function(td, cellData, rowData, row, col) {
                         $(td).addClass('text-nowrap');
-                    }
+                    },
                     width: 20,
                     render: (data, type, row, meta) => {
                         return meta.row + 1;
@@ -91,7 +91,7 @@
                     data: 'id',
                     createdCell: function(td, cellData, rowData, row, col) {
                         $(td).addClass('text-nowrap');
-                    }
+                    },
                     render: (data, type, row, meta) => {
                         const btn_edit =
                             `<button type="button" class="btn btn-warning" data-bs-toggle="modal"

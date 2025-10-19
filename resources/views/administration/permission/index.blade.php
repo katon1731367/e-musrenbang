@@ -34,7 +34,7 @@
                     data: null,
                     createdCell: function(td, cellData, rowData, row, col) {
                         $(td).addClass('text-nowrap');
-                    }
+                    },
                     width: 20,
                     render: (data, type, row, meta) => {
                         return meta.row + 1;
