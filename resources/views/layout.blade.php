@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laravel Admin Panel</title>
+    <title>E-MUSRENBANG</title>
 
     {{-- Zuramai Styles --}}
     <link rel="shortcut icon" href="{{ asset('/assets/compiled/svg/favicon.svg') }}" type="image/x-icon">
@@ -65,11 +65,11 @@
                 <footer>
                     <div class="footer clearfix mb-0 text-muted">
                         <div class="float-start">
-                            <p>2024 &copy; Farid</p>
+                            <p>2025 &copy; Kinanda</p>
                         </div>
                         <div class="float-end">
                             <p>Crafted with <span class="text-danger"><i class="bi bi-heart-fill icon-mid"></i></span>
-                                by <a href="https://saugi.me">Farid</a></p>
+                                by <a href="https://saugi.me">Kinanda</a></p>
                         </div>
                     </div>
                 </footer>

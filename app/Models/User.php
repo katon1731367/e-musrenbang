@@ -47,4 +47,9 @@ class User extends Authenticatable
             'updated_at' => 'datetime:Y-m-d H:i:s',
         ];
     }
+
+    public function biodata()
+    {
+        return $this->hasOne(UserBiodata::class, 'user_id');
+    }
 }

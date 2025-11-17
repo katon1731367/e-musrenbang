@@ -25,7 +25,7 @@
             <div class="col-lg-5 col-12">
                 <div id="auth-left">
                     <div class="auth-logo">
-                        <a href="index.html"><img src="{{ asset('assets/compiled/svg/logo.svg') }}" alt="Logo"></a>
+                        <a href="index.html" class="navbar-brand fs-4 fw-bold text-primary">E-MUSRENBANG</a>
                     </div>
                     <h1 class="auth-title">Log in.</h1>
                     <p class="auth-subtitle mb-5">Log in with your data that you entered during registration.</p>
@@ -33,11 +33,9 @@
                     <form method="POST">
                         @csrf
                         <div class="form-group position-relative has-icon-left mb-4">
-                            <input type="text"
-                                class="form-control form-control-xl @error('name')
+                            <input type="text" class="form-control form-control-xl @error('name')
                                 is-invalid
-                            @enderror"
-                                placeholder="Name" name="name">
+                            @enderror" placeholder="Name" name="name">
                             <div class="form-control-icon">
                                 <i class="bi bi-person"></i>
                             </div>
@@ -83,7 +81,7 @@
     </div>
 
     <script>
-        $(document).on('click', '.toggle-password', function(e) {
+        $(document).on('click', '.toggle-password', function (e) {
             var password = $(this).siblings('.password');
             // toggle the type attribute
             const type = password.attr("type") === "password" ? "text" : "password";
