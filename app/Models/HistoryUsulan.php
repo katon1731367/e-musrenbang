@@ -5,18 +5,19 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class TindakLanjutUsulan extends Model
+class HistoryUsulan extends Model
 {
     use HasFactory;
 
-    protected $table = 'tindak_lanjut_usulan';
+    protected $table = 'history_usulan';
     public $timestamps = true;
 
     protected $fillable = [
         'id_usulan',
-        'id_status_tindak_lanjut',
-        'keterangan',
+        'id_status_usulan_lama',
+        'id_status_usulan_baru',
         'created_by',
+        'keterangan',
     ];
 
     public function usulan()
@@ -24,9 +25,14 @@ class TindakLanjutUsulan extends Model
         return $this->belongsTo(Usulan::class, 'id_usulan');
     }
 
-    public function statusTindakLanjut()
+    public function statusLama()
     {
-        return $this->belongsTo(StatusTindakLanjut::class, 'id_status_tindak_lanjut');
+        return $this->belongsTo(StatusUsulan::class, 'id_status_usulan_lama');
+    }
+
+    public function statusBaru()
+    {
+        return $this->belongsTo(StatusUsulan::class, 'id_status_usulan_baru');
     }
 
     public function createdBy()

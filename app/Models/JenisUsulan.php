@@ -11,19 +11,13 @@ class JenisUsulan extends Model
 
     protected $table = 'jenis_usulan';
 
-    // Primary key
     protected $primaryKey = 'id';
 
-    // Kolom yang bisa diisi
     protected $fillable = [
         'nama',
         'deskripsi',
     ];
 
-    /**
-     * Relasi ke model Usulan
-     * Satu jenis usulan bisa memiliki banyak usulan
-     */
     public function usulan()
     {
         return $this->hasMany(Usulan::class, 'id_jenis_usulan');

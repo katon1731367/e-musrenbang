@@ -52,4 +52,9 @@ class User extends Authenticatable
     {
         return $this->hasOne(UserBiodata::class, 'user_id');
     }
+
+    public function locations()
+    {
+        return $this->belongsToMany(Location::class, 'user_locations', 'user_id', 'location_id');
+    }
 }

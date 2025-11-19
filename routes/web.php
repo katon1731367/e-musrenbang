@@ -7,6 +7,7 @@ use App\Http\Controllers\MenuController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SubmenuController;
+use App\Http\Controllers\TindakLanjutUsulanController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,8 +28,15 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('usulan/data', [UsulanController::class, 'getData'])->name('usulan.data');
     Route::resource('usulan', UsulanController::class);
+    Route::put('usulan/{id}/status', [UsulanController::class, 'updateStatus']);
+
+    Route::get('usulan/{id}/history', [UsulanController::class, 'getHistory'])->name('usulan.history');
+    Route::get('usulan/{id}/tindak-lanjut', [UsulanController::class, 'getTindakLanjut']);
+
+    Route::post('tindak-lanjut', [TindakLanjutUsulanController::class, 'store'])->name('tindak-lanjut.store');
+
     Route::middleware(['auth'])->group(function () {
-    Route::get('/dokumen-usulan/{id}', [DokumenUsulanController::class, 'download'])
-        ->name('dokumen-usulan.download');
-});
+        Route::get('/dokumen-usulan/{id}', [DokumenUsulanController::class, 'download'])
+            ->name('dokumen-usulan.download');
+    });
 });

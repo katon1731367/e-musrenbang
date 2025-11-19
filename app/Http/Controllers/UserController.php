@@ -15,9 +15,7 @@ class UserController extends Controller
         Session::put('page_title', 'User');
         Session::put('menu', 'User');
     }
-    /**
-     * Display a listing of the resource.
-     */
+
     public function index()
     {
         if (!(request()->user()->can('viewAny~User')))
@@ -33,9 +31,6 @@ class UserController extends Controller
         return view('administration.user.index', compact('users', 'roles'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         if (!(request()->user()->can('view~User')))
@@ -53,13 +48,10 @@ class UserController extends Controller
 
         return Response()->json([
             'content' => 'user ' . $validated['name'] . ' created!',
-            'type' => 'success' // or 'error'
+            'type' => 'success'
         ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(string $id)
     {
         if (!(request()->user()->can('update~User')))
@@ -69,9 +61,6 @@ class UserController extends Controller
         return Response()->json($user);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, string $id)
     {
         if (!(request()->user()->can('update~User')))
@@ -96,13 +85,10 @@ class UserController extends Controller
 
         return Response()->json([
             'content' => "user {$user->name} updated!",
-            'type' => 'success' // or 'error'
+            'type' => 'success'
         ]);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id)
     {
         if (!(request()->user()->can('delete~User')))
@@ -113,7 +99,7 @@ class UserController extends Controller
 
         return Response()->json([
             'content' => 'user ' . $user['name'] . ' deleted!',
-            'type' => 'success' // or 'error'
+            'type' => 'success'
         ]);
     }
 }
