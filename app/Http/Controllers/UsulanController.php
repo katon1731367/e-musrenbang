@@ -304,8 +304,8 @@ class UsulanController extends Controller
 
     public function update(Request $request, $id)
     {
-        // DB::beginTransaction();
-        // try {
+        DB::beginTransaction();
+        try {
             $usulan = Usulan::with('pengusul', 'createdBy')->findOrFail($id);
 
             $statusSaatIni = $usulan->id_status_usulan;
@@ -330,13 +330,13 @@ class UsulanController extends Controller
             $alamat = '-';
             if ($request->latitude && $request->longitude) {
                 $client = new \GuzzleHttp\Client();
-                // try {
+                try {
                     $res = $client->get("https://nominatim.openstreetmap.org/reverse?format=json&lat={$request->latitude}&lon={$request->longitude}&zoom=18");
                     $data = json_decode($res->getBody(), true);
                     $alamat = $data['display_name'] ?? '-';
-                // } catch (\Exception $e) {
-                //     $alamat = "({$request->latitude}, {$request->longitude})";
-                // }
+                } catch (\Exception $e) {
+                    $alamat = "({$request->latitude}, {$request->longitude})";
+                }
             }
 
             $usulan->update([
@@ -415,14 +415,14 @@ class UsulanController extends Controller
                 'message' => 'Usulan berhasil diperbarui.'
             ]);
 
-        // } catch (\Exception $e) {
-        //     DB::rollBack();
-        //     Log::error('Update Usulan Error: ' . $e->getMessage());
-        //     return response()->json([
-        //         'success' => false,
-        //         'message' => 'Terjadi kesalahan saat memperbarui usulan.'
-        //     ], 500);
-        // }
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Update Usulan Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat memperbarui usulan.'
+            ], 500);
+        }
     }
 
     public function destroy($id)
