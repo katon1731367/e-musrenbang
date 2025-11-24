@@ -57,4 +57,9 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Location::class, 'user_locations', 'user_id', 'location_id');
     }
+
+    public function userLocations()
+    {
+        return $this->hasMany(UserLocation::class, 'user_id');
+    }
 }

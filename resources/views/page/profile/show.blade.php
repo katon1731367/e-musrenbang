@@ -1,4 +1,3 @@
-{{-- resources/views/profile/show.blade.php --}}
 @extends('layout') {{-- Sesuaikan dengan layout utama Anda --}}
 
 @section('title', 'Profil Saya')
@@ -23,7 +22,6 @@
 
                     <div class="row">
                         <div class="col-md-4 text-center mb-3">
-                            {{-- Gunakan accessor dari biodata --}}
                             <div class="avatar avatar-xl">
                                 <img src="{{ $biodata?->foto_url }}" alt="Avatar" class="avatar-img rounded-circle">
                             </div>
@@ -67,10 +65,27 @@
 
                             <h6 class="text-muted mt-3">Lokasi Terkait</h6>
                             <ul class="list-group list-group-flush">
-                                @if($location)
-                                    <li class="list-group-item">{{ $location->name }} ({{ $location->type }})</li>
+                                @if($userRole === 'SUPER ADMIN – KECAMATAN')
+                                    @if($location)
+                                        <li class="list-group-item">
+                                            <strong>Kecamatan:</strong> {{ $location->name }} ({{ $location->type }})
+                                        </li>
+                                        @if($desaTerkait)
+                                            <li class="list-group-item">
+                                                <strong>Desa Terkait (Otomatis):</strong> {{ $desaTerkait }}
+                                            </li>
+                                        @else
+                                            <li class="list-group-item text-muted">Belum ada desa terkait (silakan edit profil)</li>
+                                        @endif
+                                    @else
+                                        <li class="list-group-item text-muted">Kecamatan belum dipilih</li>
+                                    @endif
                                 @else
-                                    <li class="list-group-item text-muted">Tidak ada lokasi terkait</li>
+                                    @if($location)
+                                        <li class="list-group-item">{{ $location->name }} ({{ $location->type }})</li>
+                                    @else
+                                        <li class="list-group-item text-muted">Tidak ada lokasi terkait</li>
+                                    @endif
                                 @endif
                             </ul>
                         </div>

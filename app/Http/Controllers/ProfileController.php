@@ -11,7 +11,7 @@ use App\Models\UserBiodata;
 use App\Models\UserLocation;
 use App\Models\Location;
 use Illuminate\Support\Facades\DB;
-use Storage;// Tambahkan ini untuk transaksi
+use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
 {
@@ -19,71 +19,113 @@ class ProfileController extends Controller
     {
         $user = Auth::user();
         $biodata = $user->biodata;
-        $location = $user->locations()->first();
 
-        return view('page.profile.show', compact('user', 'biodata', 'location'));
+        $userRole = $user->getRoleNames()->first() ?? '';
+        $location = null;
+
+        if ($userRole === 'SUPER ADMIN – KECAMATAN') {
+            $location = $user->userLocations()
+                ->whereHas('location', fn($q) => $q->where('type', 'kecamatan'))
+                ->with('location')
+                ->first()?->location;
+
+            $desaTerkait = $user->userLocations()
+                ->whereHas('location', fn($q) => $q->where('type', 'desa'))
+                ->with('location')
+                ->get()
+                ->pluck('location.name')
+                ->join(', ');
+        } else {
+            $location = $user->userLocations()
+                ->whereHas('location', fn($q) => $q->where('type', 'desa'))
+                ->with('location')
+                ->first()?->location;
+
+            $desaTerkait = null;
+        }
+
+        return view('page.profile.show', compact('user', 'biodata', 'location', 'desaTerkait', 'userRole'));
     }
 
     public function edit()
     {
         $user = Auth::user();
         $biodata = $user->biodata;
-        $userLocations = $user->locations()->pluck('location_id')->toArray();
-        $locations = Location::where('type', 'desa')->get();
-$biodata?->foto_url;
-        return view('page.profile.edit', compact('user', 'biodata', 'userLocations', 'locations'));
+        $userRole = $user->getRoleNames()->first() ?? '';
+
+        $userLocationRecords = $user->userLocations()->with('location')->get();
+
+        $userDesaIds = $userLocationRecords
+            ->where('location.type', 'desa')
+            ->pluck('location_id')
+            ->toArray();
+
+        $userKecamatanId = $userLocationRecords
+            ->where('location.type', 'kecamatan')
+            ->first()?->location_id;
+
+        $kecamatans = Location::where('type', 'kecamatan')->get();
+
+        if ($userKecamatanId) {
+            $desas = Location::where('type', 'desa')->where('parent_id', $userKecamatanId)->get();
+        } else {
+            $desas = Location::where('type', 'desa')->get();
+        }
+
+        return view('page.profile.edit', compact(
+            'user', 'biodata', 'userDesaIds', 'userKecamatanId',
+            'kecamatans', 'desas', 'userRole'
+        ));
     }
 
     public function update(Request $request)
     {
         $user = Auth::user();
+        $userRole = $user->getRoleNames()->first() ?? '';
 
-        $validator = Validator::make($request->all(), [
+        $rules = [
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $user->id,
             'password' => 'nullable|min:8|confirmed',
-            'foto' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Validasi file gambar
+            'foto' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'nik' => 'nullable|string|max:20',
             'jabatan' => 'nullable|string|max:50',
             'alamat' => 'nullable|string',
             'no_hp' => 'nullable|string|max:20',
-            'locations' => 'nullable|array',
-            'locations.*' => 'exists:locations,id',
-        ]);
+        ];
 
+        if ($userRole === 'SUPER ADMIN – KECAMATAN') {
+            $rules['kecamatan'] = 'required|exists:locations,id';
+        } else {
+            $rules['locations'] = 'nullable|array';
+            $rules['locations.*'] = 'exists:locations,id';
+        }
+
+        $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
+            return back()->withErrors($validator)->withInput();
         }
 
         DB::beginTransaction();
+
         try {
             $user->update([
                 'name' => $request->name,
                 'email' => $request->email,
             ]);
 
-            // --- Perubahan Utama: Logika untuk upload foto sekarang di UserBiodata ---
-            $fotoPath = null;
             if ($request->hasFile('foto')) {
-                // Ambil biodata user, buat jika belum ada
                 $biodata = $user->biodata()->firstOrCreate(['user_id' => $user->id]);
 
-                // Hapus foto lama jika ada
                 if ($biodata->foto) {
-                    Storage::delete('profil/' . $biodata->foto); // Sesuaikan folder jika berbeda
+                    Storage::disk('public')->delete('profil/' . $biodata->foto);
                 }
 
-                // Simpan foto baru
-                $fotoFile = $request->file('foto');
-                $fotoPath = $fotoFile->store('profil', 'public'); // Simpan di storage/app/public/profil
-
-                // Ambil nama file saja dari path yang dikembalikan
+                $fotoPath = $request->file('foto')->store('profil', 'public');
                 $fotoName = basename($fotoPath);
 
-                // Update biodata dengan nama file foto
                 $biodata->update(['foto' => $fotoName]);
             }
-            // ---
 
             if ($request->filled('password')) {
                 $user->update([
@@ -91,7 +133,6 @@ $biodata?->foto_url;
                 ]);
             }
 
-            // Update/Create biodata (tanpa foto, karena sudah ditangani di atas)
             $user->biodata()->updateOrCreate(
                 ['user_id' => $user->id],
                 [
@@ -99,22 +140,48 @@ $biodata?->foto_url;
                     'jabatan' => $request->jabatan,
                     'alamat' => $request->alamat,
                     'no_hp' => $request->no_hp,
-                    // Jangan sertakan 'foto' di sini karena sudah di-update sebelumnya
                 ]
             );
 
-            // Gunakan sync() untuk Many-to-Many
-            $user->locations()->sync($request->input('locations', []));
+            if ($userRole === 'SUPER ADMIN – KECAMATAN') {
+                UserLocation::where('user_id', $user->id)->delete();
+
+                $selectedKecamatanId = $request->input('kecamatan');
+
+                UserLocation::create([
+                    'user_id' => $user->id,
+                    'location_id' => $selectedKecamatanId,
+                ]);
+
+                $desaIds = Location::where('parent_id', $selectedKecamatanId)
+                    ->where('type', 'desa')
+                    ->pluck('id')
+                    ->toArray();
+
+                foreach ($desaIds as $desaId) {
+                    UserLocation::create([
+                        'user_id' => $user->id,
+                        'location_id' => $desaId,
+                    ]);
+                }
+            } else {
+                $user->userLocations()->delete();
+
+                $selectedLocations = $request->input('locations', []);
+
+                foreach ($selectedLocations as $locId) {
+                    UserLocation::create([
+                        'user_id' => $user->id,
+                        'location_id' => $locId,
+                    ]);
+                }
+            }
 
             DB::commit();
-
             return redirect()->route('profile.edit')->with('success', 'Profil berhasil diperbarui.');
-
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Update Profile Error: ' . $e->getMessage());
-            \Log::error('Update Profile Trace: ', $e->getTraceAsString());
-            return redirect()->back()->with('error', 'Gagal memperbarui profil. Detail: ' . $e->getMessage());
+            return back()->with('error', 'Gagal memperbarui profil. Detail: ' . $e->getMessage());
         }
     }
 }

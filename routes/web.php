@@ -10,6 +10,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SubmenuController;
 use App\Http\Controllers\TindakLanjutUsulanController;
 use App\Http\Controllers\UserController;
+use App\Models\Location;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\UsulanController;
@@ -45,4 +46,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    Route::get('/ajax/desa-by-kecamatan/{id}', function ($id) {
+        return Location::where('parent_id', $id)
+            ->where('type', 'desa')
+            ->get();
+    });
 });
