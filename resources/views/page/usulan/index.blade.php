@@ -8,33 +8,42 @@
 
     <div class="container mt-4">
 
+        <!-- Di dalam container Anda, mungkin setelah judul atau sebelum tabel -->
         <div class="d-flex justify-content-between mb-3">
             <h4 class="fw-bold">Daftar Usulan</h4>
-            @php
-                $userRole = Auth::user()->getRoleNames()->first() ?? '';
-            @endphp
-            <?php if (in_array($userRole, ['USER – RT/RW', 'ADMIN – DESA'])) { ?>
-            <button class="btn btn-primary" id="btnTambah">
-                <i class="bi bi-plus-lg"></i> Tambah Usulan
-            </button>
-            <?php } ?>
+            <div>
+                <a href="{{ route('usulan.export.excel') }}" class="btn btn-success">
+                    <i class="bi bi-file-earmark-excel"></i> Export ke Excel
+                </a>
+                <!-- Tombol Tambah Usulan Anda -->
+                @php
+                    $userRole = Auth::user()->getRoleNames()->first() ?? '';
+                @endphp
+                <?php if (in_array($userRole, ['USER – RT/RW', 'ADMIN – DESA'])) { ?>
+                <button class="btn btn-primary" id="btnTambah">
+                    <i class="bi bi-plus-lg"></i> Tambah Usulan
+                </button>
+                <?php } ?>
+            </div>
         </div>
 
         <div class="card shadow-sm">
             <div class="card-body">
-                <table id="tabelUsulan" class="table table-bordered table-striped w-100">
-                    <thead>
-                        <tr>
-                            <th>No</th>
-                            <th>Judul</th>
-                            <th>Deskripsi</th>
-                            <th>Jenis Usulan</th>
-                            <th>Status Usulan</th>
-                            <th>Alamat</th>
-                            <th>Aksi</th>
-                        </tr>
-                    </thead>
-                </table>
+                <div class="table-responsive">
+                    <table id="tabelUsulan" class="table table-bordered table-striped w-100">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Judul</th>
+                                <th>Deskripsi</th>
+                                <th>Jenis Usulan</th>
+                                <th>Status Usulan</th>
+                                <th>Alamat</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -223,8 +232,8 @@
                         if (data.length > 0) {
                             $.each(data.slice(0, 5), function (i, place) {
                                 const item = $(`<button type="button" class="list-group-item list-group-item-action">
-                                                                            ${place.display_name}
-                                                                        </button>`);
+                                                                                                                ${place.display_name}
+                                                                                                            </button>`);
                                 item.on('click', function () {
                                     const lat = parseFloat(place.lat);
                                     const lon = parseFloat(place.lon);
@@ -261,13 +270,36 @@
                 ajax: '{{ route('usulan.data') }}',
                 columns: [
                     { data: null, render: (data, type, row, meta) => meta.row + 1 },
-                    { data: 'judul' },
-                    { data: 'deskripsi' },
-                    { data: 'jenis_usulan.nama', defaultContent: '-' },
-                    { data: 'html_status' },
-                    { data: 'alamat_tampil', width: '20%' },
+                    {
+                        data: 'judul',
+                        width: '15%'
+                    },
+                    {
+                        data: 'deskripsi',
+                        width: '25%',
+                        render: function (data, type, row) {
+                            if (type === 'display' && data.length > 50) {
+                                return data.substr(0, 50) + '...';
+                            }
+                            return data;
+                        }
+                    },
+                    {
+                        data: 'jenis_usulan.nama',
+                        defaultContent: '-',
+                        width: '10%'
+                    },
+                    {
+                        data: 'html_status',
+                        width: '10%'
+                    },
+                    {
+                        data: 'alamat_tampil',
+                        width: '20%'
+                    },
                     {
                         data: null,
+                        width: '15%',
                         render: function (data) {
                             let btns = '';
                             if (data.bisa_edit) {
@@ -279,11 +311,15 @@
                             if (data.bisa_hapus) {
                                 btns += `<button class="btn btn-sm btn-danger btnDelete" data-id="${data.id}"><i class="bi bi-trash"></i> Hapus</button> `;
                             }
+                            if (data.bisa_tindak_lanjut) {
+                                btns += `<button class="btn btn-sm btn-secondary btnTindakLanjut" data-id="${data.id}"><i class="bi bi-journal-check"></i> Tindak Lanjut</button> `;
+                            }
                             btns += `<button class="btn btn-sm btn-info btnDetail" data-id="${data.id}"><i class="bi bi-eye"></i> Detail</button>`;
                             return btns;
                         }
                     }
                 ],
+                responsive: true,
                 language: {
                     emptyTable: "Belum ada data usulan",
                     lengthMenu: "Tampilkan _MENU_ data per halaman",
@@ -387,6 +423,7 @@
                     $('#deskripsi').val(data.deskripsi);
                     $('#latitude').val(data.latitude);
                     $('#longitude').val(data.longitude);
+                    $('#alamat').val(data.alamat);
 
                     if (data.id_pengusul) {
                         $('#id_pengusul').val(data.id_pengusul);
@@ -425,18 +462,18 @@
 
                         if (d) {
                             dokumenHtml += `<div class="alert alert-info p-2 small">
-                                                                                                <i class="bi bi-file-earmark-check me-1"></i>
-                                                                                                <a href="/dokumen-usulan/${btoa(d.id)}" target="_blank" class="text-dark">
-                                                                                                    ${d.name_file}
-                                                                                                </a>
-                                                                                                <br>
-                                                                                                <small class="text-muted">Diunggah: ${new Date(d.created_at).toLocaleDateString()}</small>
-                                                                                            </div>`;
+                                                                                                                                                                        <i class="bi bi-file-earmark-check me-1"></i>
+                                                                                                                                                                        <a href="/dokumen-usulan/${btoa(d.id)}" target="_blank" class="text-dark">
+                                                                                                                                                                            ${d.name_file}
+                                                                                                                                                                        </a>
+                                                                                                                                                                        <br>
+                                                                                                                                                                        <small class="text-muted">Diunggah: ${new Date(d.created_at).toLocaleDateString()}</small>
+                                                                                                                                                                    </div>`;
                         }
 
                         dokumenHtml += `<input type="file" name="dokumen[{{ $jenis->id }}]" class="form-control" accept=".pdf,.doc,.docx,.jpg,.png">
-                                                                                            ${d ? '<small class="text-muted">Biarkan kosong jika tidak ingin mengganti.</small>' : ''}
-                                                                                        </div>`;
+                                                                                                                                                                    ${d ? '<small class="text-muted">Biarkan kosong jika tidak ingin mengganti.</small>' : ''}
+                                                                                                                                                                </div>`;
                     @endforeach
 
                     dokumenSection.html(dokumenHtml);
@@ -493,123 +530,123 @@
                     let pengusulTelp = data.id_pengusul ? data.pengusul.no_telp_pengusul : '-';
 
                     let html = `<div class="mb-3">
-                                    <h6 class="text-primary mb-2">Judul Usulan</h6>
-                                    <p class="ms-3">${data.judul}</p>
-                                </div>
+                                                                        <h6 class="text-primary mb-2">Judul Usulan</h6>
+                                                                        <p class="ms-3">${data.judul}</p>
+                                                                    </div>
 
-                                <div class="mb-3">
-                                    <h6 class="text-primary mb-2">Deskripsi</h6>
-                                    <p class="ms-3">${data.deskripsi || '-'}</p>
-                                </div>
+                                                                    <div class="mb-3">
+                                                                        <h6 class="text-primary mb-2">Deskripsi</h6>
+                                                                        <p class="ms-3">${data.deskripsi || '-'}</p>
+                                                                    </div>
 
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <h6 class="text-primary mb-2">Jenis Usulan</h6>
-                                        <p class="ms-3">${data.jenis_usulan ? data.jenis_usulan.nama : '-'}</p>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <h6 class="text-primary mb-2">Status</h6>
-                                        <p class="ms-3">
-                                                <span class="badge ${getBadgeClass(data)} text-wrap">${data.status_label_tampil}</span>
-                                        </p>
-                                    </div>
-                                </div>
+                                                                    <div class="row mb-3">
+                                                                        <div class="col-md-6">
+                                                                            <h6 class="text-primary mb-2">Jenis Usulan</h6>
+                                                                            <p class="ms-3">${data.jenis_usulan ? data.jenis_usulan.nama : '-'}</p>
+                                                                        </div>
+                                                                        <div class="col-md-6">
+                                                                            <h6 class="text-primary mb-2">Status</h6>
+                                                                            <p class="ms-3">
+                                                                                    <span class="badge ${getBadgeClass(data)} text-wrap">${data.status_label_tampil}</span>
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
 
-                                <div class="mb-3">
-                                    <h6 class="text-primary mb-2">Lokasi Usulan</h6>
-                                    <div class="ms-3">
-                                        <div id="mapDetail" style="height: 300px; border-radius: 8px; border: 1px solid #ddd;" class="mb-2"></div>
+                                                                    <div class="mb-3">
+                                                                        <h6 class="text-primary mb-2">Lokasi Usulan</h6>
+                                                                        <div class="ms-3">
+                                                                            <div id="mapDetail" style="height: 300px; border-radius: 8px; border: 1px solid #ddd;" class="mb-2"></div>
 
-                                        <div class="alert alert-info mb-2" id="alamatInfo">
-                                            <div class="d-flex align-items-center">
-                                                <div class="spinner-border spinner-border-sm me-2" role="status">
-                                                    <span class="visually-hidden">Loading...</span>
-                                                </div>
-                                                <small>Memuat informasi alamat...</small>
-                                            </div>
-                                        </div>
+                                                                            <div class="alert alert-info mb-2" id="alamatInfo">
+                                                                                <div class="d-flex align-items-center">
+                                                                                    <div class="spinner-border spinner-border-sm me-2" role="status">
+                                                                                        <span class="visually-hidden">Loading...</span>
+                                                                                    </div>
+                                                                                    <small>Memuat informasi alamat...</small>
+                                                                                </div>
+                                                                            </div>
 
-                                        <div class="row mb-2">
-                                            <div class="col-md-6">
-                                                <small class="text-muted">
-                                                    <i class="bi bi-geo-alt-fill text-danger"></i> 
-                                                    <strong>Latitude:</strong> ${data.latitude}
-                                                </small>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <small class="text-muted">
-                                                    <i class="bi bi-geo-alt-fill text-danger"></i> 
-                                                    <strong>Longitude:</strong> ${data.longitude}
-                                                </small>
-                                            </div>
-                                        </div>
+                                                                            <div class="row mb-2">
+                                                                                <div class="col-md-6">
+                                                                                    <small class="text-muted">
+                                                                                        <i class="bi bi-geo-alt-fill text-danger"></i> 
+                                                                                        <strong>Latitude:</strong> ${data.latitude}
+                                                                                    </small>
+                                                                                </div>
+                                                                                <div class="col-md-6">
+                                                                                    <small class="text-muted">
+                                                                                        <i class="bi bi-geo-alt-fill text-danger"></i> 
+                                                                                        <strong>Longitude:</strong> ${data.longitude}
+                                                                                    </small>
+                                                                                </div>
+                                                                            </div>
 
-                                        <div class="d-grid gap-2">
-                                            <a href="https://www.google.com/maps?q=${data.latitude},${data.longitude}" 
-                                                target="_blank" 
-                                                class="btn btn-success btn-sm">
-                                                <i class="bi bi-map"></i> Buka di Google Maps
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
+                                                                            <div class="d-grid gap-2">
+                                                                                <a href="https://www.google.com/maps?q=${data.latitude},${data.longitude}" 
+                                                                                    target="_blank" 
+                                                                                    class="btn btn-success btn-sm">
+                                                                                    <i class="bi bi-map"></i> Buka di Google Maps
+                                                                                </a>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
 
-                                <div class="mb-3">
-                                    <h6 class="text-primary mb-2">Pengusul</h6>
-                                    <div class="ms-3">
-                                        <p class="mb-1"><strong>Nama:</strong> ${pengusulNama}</p>
-                                        <p class="mb-1"><strong>Alamat:</strong> ${pengusulAlamat}</p>
-                                        <p class="mb-0"><strong>No. Telepon:</strong> ${pengusulTelp}</p>
-                                    </div>
-                                </div>`;
+                                                                    <div class="mb-3">
+                                                                        <h6 class="text-primary mb-2">Pengusul</h6>
+                                                                        <div class="ms-3">
+                                                                            <p class="mb-1"><strong>Nama:</strong> ${pengusulNama}</p>
+                                                                            <p class="mb-1"><strong>Alamat:</strong> ${pengusulAlamat}</p>
+                                                                            <p class="mb-0"><strong>No. Telepon:</strong> ${pengusulTelp}</p>
+                                                                        </div>
+                                                                    </div>`;
 
                     if (data.dokumen && data.dokumen.length > 0) {
                         html += ` <div class="mb-3">
-                                                    <h6 class="text-primary mb-2">Dokumen Lampiran</h6>
-                                                    <div class="list-group ms-3">`;
+                                                                                        <h6 class="text-primary mb-2">Dokumen Lampiran</h6>
+                                                                                        <div class="list-group ms-3">`;
 
                         data.dokumen.forEach(d => {
                             // Ambil nama jenis dokumen, fallback ke '-' jika tidak ada
                             const jenisDokumenNama = d.jenis_dokumen ? d.jenis_dokumen.nama : '-';
 
                             html += `<div class="list-group-item d-flex justify-content-between align-items-start">
-                                        <div class="flex-grow-1 me-3">
-                                            <div>
-                                                <i class="bi bi-file-earmark-text-fill text-primary me-2"></i>
-                                                <strong>${d.name_file}</strong>
-                                            </div>
-                                            <small class="text-muted">
-                                                Jenis: <span class="badge bg-light text-dark border">${jenisDokumenNama}</span>
-                                            </small>
-                                        </div>
-                                        <a href="/dokumen-usulan/${btoa(d.id)}" target="_blank" class="btn btn-sm btn-outline-primary flex-shrink-0">
-                                            <i class="bi bi-download"></i> Unduh
-                                        </a>
-                                    </div>`;
+                                                                            <div class="flex-grow-1 me-3">
+                                                                                <div>
+                                                                                    <i class="bi bi-file-earmark-text-fill text-primary me-2"></i>
+                                                                                    <strong>${d.name_file}</strong>
+                                                                                </div>
+                                                                                <small class="text-muted">
+                                                                                    Jenis: <span class="badge bg-light text-dark border">${jenisDokumenNama}</span>
+                                                                                </small>
+                                                                            </div>
+                                                                            <a href="/dokumen-usulan/${btoa(d.id)}" target="_blank" class="btn btn-sm btn-outline-primary flex-shrink-0">
+                                                                                <i class="bi bi-download"></i> Unduh
+                                                                            </a>
+                                                                        </div>`;
                         });
 
                         html += `</div>
-                            </div>`;
+                                                                </div>`;
                     }
 
                     const detailModal = `<div class="modal fade" id="modalDetailUsulan" tabindex="-1" aria-labelledby="modalDetailUsulanLabel" aria-hidden="true">
-                                            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-                                                <div class="modal-content">
-                                                    <div class="modal-header bg-primary text-white">
-                                                        <h5 class="modal-title text-white" id="modalDetailUsulanLabel">
-                                                            <i class="bi bi-info-circle-fill me-2"></i>Detail Usulan
-                                                        </h5>
-                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <div class="modal-body">
-                                                        ${html}
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>`;
+                                                                                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                                                                                    <div class="modal-content">
+                                                                                        <div class="modal-header bg-primary text-white">
+                                                                                            <h5 class="modal-title text-white" id="modalDetailUsulanLabel">
+                                                                                                <i class="bi bi-info-circle-fill me-2"></i>Detail Usulan
+                                                                                            </h5>
+                                                                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                                                        </div>
+                                                                                        <div class="modal-body">
+                                                                                            ${html}
+                                                                                        </div>
+                                                                                        <div class="modal-footer">
+                                                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>`;
 
                     $('body').append(detailModal);
 
@@ -625,14 +662,14 @@
                                 const user = h.created_by.name;
 
                                 historyHtml += `
-                                                <li class="list-group-item">
-                                                    <small>
-                                                        <i class="bi bi-clock"></i> ${waktu}<br>
-                                                        <strong>${dari}</strong> → <strong>${ke}</strong><br>
-                                                        Oleh: ${user}
-                                                    </small>
-                                                </li>
-                                            `;
+                                                                                    <li class="list-group-item">
+                                                                                        <small>
+                                                                                            <i class="bi bi-clock"></i> ${waktu}<br>
+                                                                                            <strong>${dari}</strong> → <strong>${ke}</strong><br>
+                                                                                            Oleh: ${user}
+                                                                                        </small>
+                                                                                    </li>
+                                                                                `;
                             });
                         } else {
                             historyHtml += '<li class="list-group-item text-muted">Belum ada riwayat</li>';
@@ -653,12 +690,12 @@
                                 tlHtml += `<h6 class="mt-3">Dokumen Tindak Lanjut</h6><ul class="list-group">`;
                                 tlRes.data.dokumen.forEach(d => {
                                     tlHtml += `
-                                    <li class="list-group-item">
-                                        <a href="/dokumen-tindak-lanjut/${btoa(d.id)}" target="_blank">
-                                            ${d.name_file}
-                                        </a>
-                                    </li>
-                                `;
+                                                                        <li class="list-group-item">
+                                                                            <a href="/dokumen-tindak-lanjut/${btoa(d.id)}" target="_blank">
+                                                                                ${d.name_file}
+                                                                            </a>
+                                                                        </li>
+                                                                    `;
                                 });
                                 tlHtml += `</ul>`;
                             }
@@ -699,36 +736,36 @@
                                 alamatLengkap = parts.join(', ');
 
                                 $('#alamatInfo').removeClass('alert-info').addClass('alert-success').html(`
-                                                            <div>
-                                                                <i class="bi bi-pin-map-fill me-2"></i>
-                                                                <strong>Alamat:</strong><br>
-                                                                <small>${alamatLengkap || response.display_name}</small>
-                                                            </div>
-                                                        `);
+                                                                                                <div>
+                                                                                                    <i class="bi bi-pin-map-fill me-2"></i>
+                                                                                                    <strong>Alamat:</strong><br>
+                                                                                                    <small>${alamatLengkap || response.display_name}</small>
+                                                                                                </div>
+                                                                                            `);
 
                                 marker.bindPopup(`
-                                                            <strong>${data.judul}</strong><br>
-                                                            <small>${alamatLengkap || response.display_name}</small>
-                                                        `).openPopup();
+                                                                                                <strong>${data.judul}</strong><br>
+                                                                                                <small>${alamatLengkap || response.display_name}</small>
+                                                                                            `).openPopup();
                             } else {
                                 $('#alamatInfo').removeClass('alert-info').addClass('alert-warning').html(`
-                                                            <small><i class="bi bi-exclamation-triangle me-2"></i>Alamat tidak dapat ditemukan</small>
-                                                        `);
+                                                                                                <small><i class="bi bi-exclamation-triangle me-2"></i>Alamat tidak dapat ditemukan</small>
+                                                                                            `);
 
                                 marker.bindPopup(`
-                                                            <strong>${data.judul}</strong><br>
-                                                            <small>${data.deskripsi || 'Lokasi usulan'}</small>
-                                                        `).openPopup();
+                                                                                                <strong>${data.judul}</strong><br>
+                                                                                                <small>${data.deskripsi || 'Lokasi usulan'}</small>
+                                                                                            `).openPopup();
                             }
                         }).fail(function () {
                             $('#alamatInfo').removeClass('alert-info').addClass('alert-warning').html(`
-                                                        <small><i class="bi bi-exclamation-triangle me-2"></i>Gagal memuat informasi alamat</small>
-                                                    `);
+                                                                                            <small><i class="bi bi-exclamation-triangle me-2"></i>Gagal memuat informasi alamat</small>
+                                                                                        `);
 
                             marker.bindPopup(`
-                                                        <strong>${data.judul}</strong><br>
-                                                        <small>${data.deskripsi || 'Lokasi usulan'}</small>
-                                                    `).openPopup();
+                                                                                            <strong>${data.judul}</strong><br>
+                                                                                            <small>${data.deskripsi || 'Lokasi usulan'}</small>
+                                                                                        `).openPopup();
                         });
 
                         setTimeout(function () {
@@ -839,9 +876,9 @@
             let html = '<label class="form-label">Unggah Dokumen Pendukung</label>';
             @foreach($dokumenJenis as $jenis)
                 html += `<div class="mb-3">
-                            <label class="form-label">{{ ucfirst($jenis->nama) }}</label>
-                            <input type="file" name="dokumen[{{ $jenis->id }}]" class="form-control" accept=".pdf,.doc,.docx,.jpg,.png">
-                        </div>`;
+                                                                                                    <label class="form-label">{{ ucfirst($jenis->nama) }}</label>
+                                                                                                    <input type="file" name="dokumen[{{ $jenis->id }}]" class="form-control" accept=".pdf,.doc,.docx,.jpg,.png">
+                                                                                                </div>`;
             @endforeach
             $('#dokumenContainer').html(html);
         }

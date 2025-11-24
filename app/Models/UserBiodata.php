@@ -4,13 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Storage;
 
 class UserBiodata extends Model
 {
     use HasFactory;
 
     protected $table = 'user_biodata';
-    protected $primaryKey = 'id';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -18,11 +19,22 @@ class UserBiodata extends Model
         'nik',
         'jabatan',
         'alamat',
-        'no_hp'
+        'no_hp',
+        'foto'
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function getFotoUrlAttribute()
+    {
+        if ($this->foto) {
+            return Storage::url('profil/' . $this->foto);
+            
+        }
+
+        return asset('assets/compiled/jpg/1.jpg');
     }
 }

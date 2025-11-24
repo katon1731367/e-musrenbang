@@ -24,6 +24,7 @@ class Usulan extends Model
         'created_by',
         'id_desa',
         'id_kecamatan',
+        'alamat'
     ];
 
     public const STATUS_DRAFT_RT = 1;

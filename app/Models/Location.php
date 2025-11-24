@@ -22,4 +22,9 @@ class Location extends Model
     {
         return $this->belongsTo(Location::class, 'parent_id');
     }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'user_locations', 'location_id', 'user_id');
+    }
 }

@@ -15,10 +15,18 @@ use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use Session;
+
 class UsulanController extends Controller
 {
     public function index()
     {
+        Session::put('page_title', 'Usulan');
+        Session::put('menu', 'Usulan');
+
         $jenisUsulan = JenisUsulan::all();
         $dokumenJenis = JenisDokumenUsulan::all();
 
@@ -68,21 +76,27 @@ class UsulanController extends Controller
         }
         $role = $roleNames->first();
 
-        // Ambil desa yang dikelola user
-        $userDesaIds = $user->locations()
-            ->where('locations.type', 'desa')
-            ->pluck('locations.id')
-            ->toArray();
+        // Cek apakah user adalah admin atau bappeda
+        $isAdminOrBappeda = in_array($role, ['admin', 'MASTER – BAPPEDA']);
+
+        // Ambil ID desa yang terkait dengan user (kecuali admin/bappeda)
+        $userDesaIds = [];
+        if (!$isAdminOrBappeda) {
+            $userDesaIds = $user->locations()
+                ->where('locations.type', 'desa')
+                ->pluck('locations.id')
+                ->toArray();
+        }
 
         $query = Usulan::with('dokumen', 'jenisUsulan', 'status', 'createdBy');
 
-        // === FILTER BERDASARKAN STATUS + ROLE ===
-        if ($role === 'USER – RT/RW') {
-            // Hanya lihat usulan milik sendiri (semua status)
+        // Terapkan filter berdasarkan role
+        if ($isAdminOrBappeda) {
+            // Tidak ada filter, ambil semua
+        } elseif ($role === 'USER – RT/RW') {
             $query->where('created_by', $user->id);
         } elseif ($role === 'ADMIN – DESA') {
             $query->where(function ($q) use ($user, $userDesaIds) {
-                // Milik sendiri
                 $q->where('created_by', $user->id)
                     ->whereIn('id_status_usulan', [
                         Usulan::STATUS_DRAFT_DESA,
@@ -95,7 +109,6 @@ class UsulanController extends Controller
                         Usulan::STATUS_GAGAL_REVIEW_KECAMATAN,
                         Usulan::STATUS_DIAJUKAN_KECAMATAN,
                     ]);
-                // Atau dari RT/RW di desanya yang sudah diajukan
                 $q->orWhere(function ($q2) use ($userDesaIds) {
                     $q2->whereIn('id_desa', $userDesaIds)
                         ->whereIn('id_status_usulan', [
@@ -113,7 +126,6 @@ class UsulanController extends Controller
                 });
             });
         } elseif ($role === 'SUPER ADMIN – KECAMATAN') {
-            // Hanya bisa lihat usulan yang sudah diajukan ke kecamatan (status 7+)
             $query->whereIn('id_desa', $userDesaIds)
                 ->whereIn('id_status_usulan', [
                     Usulan::STATUS_DIAJUKAN_DESA,
@@ -123,21 +135,18 @@ class UsulanController extends Controller
                     Usulan::STATUS_DIAJUKAN_KECAMATAN,
                 ]);
         }
-        // Role lain (admin, bappeda) → lihat semua
 
-        $usulan = $query->get()->map(function ($item) use ($user, $role, $userDesaIds) {
+        $usulan = $query->get()->map(function ($item) use ($user, $role, $userDesaIds, $isAdminOrBappeda) {
             $item->bisa_edit = false;
             $item->bisa_ajukan = false;
             $item->bisa_hapus = false;
             $item->bisa_tindak_lanjut = false;
 
-            // Hapus hanya jika draft & milik sendiri
             $item->bisa_hapus = (
                 in_array($item->id_status_usulan, [Usulan::STATUS_DRAFT_RT, Usulan::STATUS_DRAFT_DESA])
                 && $item->created_by == $user->id
             );
 
-            // Edit & ajukan hanya jika pembuat
             if ($item->created_by == $user->id) {
                 if ($role === 'USER – RT/RW' && $item->id_status_usulan == Usulan::STATUS_DRAFT_RT) {
                     $item->bisa_edit = true;
@@ -163,7 +172,6 @@ class UsulanController extends Controller
                 }
             }
 
-            // Tindak lanjut
             if ($role === 'ADMIN – DESA' && $item->id_status_usulan == Usulan::STATUS_DIAJUKAN_RT) {
                 $item->bisa_tindak_lanjut = true;
             } elseif ($role === 'SUPER ADMIN – KECAMATAN' && $item->id_status_usulan == Usulan::STATUS_DIAJUKAN_DESA) {
@@ -227,32 +235,18 @@ class UsulanController extends Controller
             $user = Auth::user();
             $role = $user->getRoleNames()->first();
 
-            // Tentukan status awal
             $initialStatus = match ($role) {
                 'USER – RT/RW' => Usulan::STATUS_DRAFT_RT,
                 'ADMIN – DESA' => Usulan::STATUS_DRAFT_DESA,
                 default => Usulan::STATUS_DRAFT_RT,
             };
 
-            // === AMBIL LOKASI BERDASARKAN USER ===
             $lokasi = $user->locations()
                 ->where('locations.type', 'desa')
                 ->first();
 
             if (!$lokasi) {
                 throw new \Exception('User tidak terhubung dengan desa.');
-            }
-
-            $alamat = '-';
-            if ($request->latitude && $request->longitude) {
-                $client = new \GuzzleHttp\Client();
-                try {
-                    $res = $client->get("https://nominatim.openstreetmap.org/reverse?format=json&lat={$request->latitude}&lon={$request->longitude}&zoom=18");
-                    $data = json_decode($res->getBody(), true);
-                    $alamat = $data['display_name'] ?? '-';
-                } catch (\Exception $e) {
-                    $alamat = "({$request->latitude}, {$request->longitude})";
-                }
             }
 
             $usulan = Usulan::create([
@@ -266,10 +260,9 @@ class UsulanController extends Controller
                 'id_status_usulan' => $initialStatus,
                 'id_desa' => $lokasi->id,
                 'id_kecamatan' => $lokasi->parent_id,
-                'alamat' => $alamat,
+                'alamat' => $request->alamat,
             ]);
 
-            // Simpan dokumen
             if ($request->hasFile('dokumen')) {
                 foreach ($request->file('dokumen') as $idJenisDokumen => $file) {
                     if ($file) {
@@ -327,28 +320,15 @@ class UsulanController extends Controller
                 $usulan->id_status_usulan = $statusBaru;
             }
 
-            $alamat = '-';
-            if ($request->latitude && $request->longitude) {
-                $client = new \GuzzleHttp\Client();
-                try {
-                    $res = $client->get("https://nominatim.openstreetmap.org/reverse?format=json&lat={$request->latitude}&lon={$request->longitude}&zoom=18");
-                    $data = json_decode($res->getBody(), true);
-                    $alamat = $data['display_name'] ?? '-';
-                } catch (\Exception $e) {
-                    $alamat = "({$request->latitude}, {$request->longitude})";
-                }
-            }
-
             $usulan->update([
                 'id_jenis_usulan' => $request->id_jenis_usulan,
                 'judul' => $request->judul,
                 'deskripsi' => $request->deskripsi,
                 'latitude' => $request->latitude,
                 'longitude' => $request->longitude,
-                'alamat' => $alamat,
+                'alamat' => $request->alamat,
             ]);
 
-            // Update pengusul
             if ($request->pengusul_sama == 1) {
                 if ($usulan->id_pengusul) {
                     $usulan->id_pengusul = null;
@@ -372,7 +352,6 @@ class UsulanController extends Controller
                 }
             }
 
-            // Update dokumen
             if ($request->hasFile('dokumen')) {
                 foreach ($request->file('dokumen') as $idJenisDokumen => $file) {
                     $idJenisDokumen = (int) $idJenisDokumen;
@@ -469,8 +448,7 @@ class UsulanController extends Controller
                 throw new \Exception('Anda tidak berhak mengubah status ini.');
             }
 
-            // === SIMPAN HISTORY ===
-            \App\Models\HistoryUsulan::create([
+            HistoryUsulan::create([
                 'id_usulan' => $usulan->id,
                 'id_status_usulan_lama' => $currentStatus ?: null,
                 'id_status_usulan_baru' => $newStatus,
@@ -478,10 +456,7 @@ class UsulanController extends Controller
                 'keterangan' => $request->keterangan ?? 'Perubahan status usulan',
             ]);
 
-            // === UPDATE STATUS USULAN ===
             $usulan->id_status_usulan = $newStatus;
-
-            // Isi lokasi bila diajukan pertama kali
             if ($currentStatus == Usulan::STATUS_DRAFT_RT && $newStatus == Usulan::STATUS_DIAJUKAN_RT) {
                 $desa = $user->locations()->where('locations.type', 'desa')->first();
                 if ($desa) {
@@ -492,7 +467,6 @@ class UsulanController extends Controller
 
             $usulan->save();
 
-            // Sinkronisasi ke tindak lanjut (opsional)
             if (in_array($newStatus, Usulan::getStatusRejected())) {
                 TindakLanjutUsulan::updateOrCreate(
                     ['id_usulan' => $usulan->id],
@@ -634,5 +608,157 @@ class UsulanController extends Controller
             ->first();
 
         return response()->json(['data' => $tindakLanjut]);
+    }
+
+    public function exportExcel()
+    {
+        $user = Auth::user();
+        $roleNames = $user->getRoleNames();
+        if ($roleNames->isEmpty()) {
+            abort(403, 'User tidak memiliki role yang valid untuk mengekspor data.');
+        }
+        $role = $roleNames->first();
+
+        $isAdminOrBappeda = in_array($role, ['admin', 'MASTER – BAPPEDA']);
+
+        $userDesaIds = [];
+        if (!$isAdminOrBappeda) {
+            $userDesaIds = $user->locations()
+                ->where('locations.type', 'desa')
+                ->pluck('locations.id')
+                ->toArray();
+        }
+
+        $query = Usulan::with(['createdBy', 'jenisUsulan', 'status', 'dokumen']);
+
+        if ($isAdminOrBappeda) {
+            // Tidak ada filter, ambil semua
+        } elseif ($role === 'USER – RT/RW') {
+            $query->where('created_by', $user->id);
+        } elseif ($role === 'ADMIN – DESA') {
+            $query->where(function ($q) use ($user, $userDesaIds) {
+                $q->where('created_by', $user->id)
+                    ->whereIn('id_status_usulan', [
+                        Usulan::STATUS_DRAFT_DESA,
+                        Usulan::STATUS_DIAJUKAN_DESA,
+                        Usulan::STATUS_APPROVE_DESA,
+                        Usulan::STATUS_REJECT_DESA,
+                        Usulan::STATUS_GAGAL_REVIEW_DESA,
+                        Usulan::STATUS_APPROVE_KECAMATAN,
+                        Usulan::STATUS_REJECT_KECAMATAN,
+                        Usulan::STATUS_GAGAL_REVIEW_KECAMATAN,
+                        Usulan::STATUS_DIAJUKAN_KECAMATAN,
+                    ]);
+                $q->orWhere(function ($q2) use ($userDesaIds) {
+                    $q2->whereIn('id_desa', $userDesaIds)
+                        ->whereIn('id_status_usulan', [
+                            Usulan::STATUS_DIAJUKAN_RT,
+                            Usulan::STATUS_DRAFT_DESA,
+                            Usulan::STATUS_DIAJUKAN_DESA,
+                            Usulan::STATUS_APPROVE_DESA,
+                            Usulan::STATUS_REJECT_DESA,
+                            Usulan::STATUS_GAGAL_REVIEW_DESA,
+                            Usulan::STATUS_APPROVE_KECAMATAN,
+                            Usulan::STATUS_REJECT_KECAMATAN,
+                            Usulan::STATUS_GAGAL_REVIEW_KECAMATAN,
+                            Usulan::STATUS_DIAJUKAN_KECAMATAN,
+                        ]);
+                });
+            });
+        } elseif ($role === 'SUPER ADMIN – KECAMATAN') {
+            $query->whereIn('id_desa', $userDesaIds)
+                ->whereIn('id_status_usulan', [
+                    Usulan::STATUS_DIAJUKAN_DESA,
+                    Usulan::STATUS_APPROVE_KECAMATAN,
+                    Usulan::STATUS_REJECT_KECAMATAN,
+                    Usulan::STATUS_GAGAL_REVIEW_KECAMATAN,
+                    Usulan::STATUS_DIAJUKAN_KECAMATAN,
+                ]);
+        }
+
+        $usulanData = $query->get();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Daftar Usulan');
+
+        $headers = [
+            'ID',
+            'Judul',
+            'Deskripsi',
+            'Jenis Usulan',
+            'Status Usulan',
+            'Alamat',
+            'Latitude',
+            'Longitude',
+            'Tanggal Dibuat',
+            'Tanggal Diupdate',
+            'Dibuat Oleh (Nama)',
+            'Dibuat Oleh (Email)',
+            'Jumlah Dokumen',
+            'Bisa Edit',
+            'Bisa Ajukan',
+            'Bisa Hapus',
+            'Bisa Tindak Lanjut', // Catatan: Lihat komentar di bawah
+        ];
+
+        foreach ($headers as $index => $header) {
+            $column = Coordinate::stringFromColumnIndex($index + 1);
+            $sheet->setCellValue("{$column}1", $header);
+        }
+
+        $styleArray = [
+            'font' => [
+                'bold' => true,
+            ],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'E6E6E6'],
+            ],
+        ];
+        $lastColumnIndex = count($headers);
+        $lastColumn = Coordinate::stringFromColumnIndex($lastColumnIndex);
+        $sheet->getStyle("A1:{$lastColumn}1")->applyFromArray($styleArray);
+
+        $rowIndex = 2;
+        foreach ($usulanData as $usulan) {
+            $colIndex = 0;
+
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->id);
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->judul);
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, strip_tags($usulan->deskripsi));
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->jenisUsulan ? $usulan->jenisUsulan->nama : '-');
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->status ? $usulan->status->nama : '-');
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->alamat ?? '-');
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->latitude);
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->longitude);
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->created_at ? $usulan->created_at->format('Y-m-d H:i:s') : '-');
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->updated_at ? $usulan->updated_at->format('Y-m-d H:i:s') : '-');
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->createdBy ? $usulan->createdBy->name : '-');
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->createdBy ? $usulan->createdBy->email : '-');
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->dokumen ? $usulan->dokumen->count() : 0);
+
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->bisa_edit ? 'Ya' : 'Tidak'); // Gunakan nilai dari $usulan jika logika di getData() sudah diterapkan
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->bisa_ajukan ? 'Ya' : 'Tidak');
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->bisa_hapus ? 'Ya' : 'Tidak');
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex(++$colIndex) . $rowIndex, $usulan->bisa_tindak_lanjut ? 'Ya' : 'Tidak');
+
+            $rowIndex++;
+        }
+
+        foreach (range('A', Coordinate::stringFromColumnIndex(count($headers))) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $writer = new Xlsx($spreadsheet);
+
+        $fileName = 'daftar_usulan_' . date('Y-m-d_H-i-s') . '.xlsx';
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="' . $fileName . '"');
+        header('Cache-Control: max-age=0');
+
+        $writer->save('php://output');
+        exit;
     }
 }

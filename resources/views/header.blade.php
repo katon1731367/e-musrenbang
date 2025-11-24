@@ -5,8 +5,9 @@
                 <i class="bi bi-justify fs-3"></i>
             </a>
 
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
-                aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
+                aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarSupportedContent">
@@ -21,7 +22,8 @@
                             </div>
                             <div class="user-img d-flex align-items-center">
                                 <div class="avatar avatar-md">
-                                    <img src="./assets/compiled/jpg/1.jpg">
+                                    <img src="{{ auth()->user()->biodata?->foto_url }}" alt="Avatar"
+                                        class="avatar-img rounded-circle">
                                 </div>
                             </div>
                         </div>
@@ -32,9 +34,9 @@
                             <h6 class="dropdown-header">Hello, {{ explode(' ', auth()->user()->name)[0] }}!</h6>
                         </li>
                         <li>
-                            <a class="dropdown-item" href="#">
+                            <a class="dropdown-item" href="{{ route('profile.show') }}">
                                 <i class="icon-mid bi bi-person me-2"></i>
-                                My Profile
+                                Edit Profile
                             </a>
                         </li>
                         <li>
